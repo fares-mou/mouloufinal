@@ -1,0 +1,215 @@
+<?php
+session_start();
+require_once '../db/config.php';
+
+// التحقق من تسجيل الدخول
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// إضافة موعد جديد
+if (isset($_POST['add_appointment'])) {
+    $patient_name = $_POST['patient_name'];
+    $doctor_name = $_POST['doctor_name'];
+    $appointment_date = $_POST['appointment_date'];
+    $appointment_time = $_POST['appointment_time'];
+    $status = $_POST['status'];
+
+    $sql = "INSERT INTO appointments (patient_name, doctor_name, appointment_date, appointment_time, status)
+            VALUES ('$patient_name', '$doctor_name', '$appointment_date', '$appointment_time', '$status')";
+    $conn->query($sql);
+    $message = "تمت إضافة الموعد بنجاح!";
+}
+
+// تحديث موعد
+if (isset($_POST['update_appointment'])) {
+    $id = $_POST['appointment_id'];
+    $patient_name = $_POST['patient_name'];
+    $doctor_name = $_POST['doctor_name'];
+    $appointment_date = $_POST['appointment_date'];
+    $appointment_time = $_POST['appointment_time'];
+    $status = $_POST['status'];
+
+    $sql = "UPDATE appointments SET
+            patient_name='$patient_name',
+            doctor_name='$doctor_name',
+            appointment_date='$appointment_date',
+            appointment_time='$appointment_time',
+            status='$status'
+            WHERE id=$id";
+    $conn->query($sql);
+    $message = "تم تحديث الموعد بنجاح!";
+}
+
+// حذف موعد
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+    $conn->query("DELETE FROM appointments WHERE id=$id");
+    $message = "تم حذف الموعد بنجاح!";
+}
+
+// جلب جميع المواعيد
+$appointments = $conn->query("SELECT * FROM appointments ORDER BY appointment_date DESC, appointment_time DESC");
+
+// جلب موعد للتعديل
+$edit_appointment = null;
+if (isset($_GET['edit'])) {
+    $edit_id = $_GET['edit'];
+    $edit_result = $conn->query("SELECT * FROM appointments WHERE id=$edit_id");
+    if ($edit_result->num_rows > 0) {
+        $edit_appointment = $edit_result->fetch_assoc();
+    }
+}
+
+// قائمة الأطباء
+$doctors = ["د. أحمد", "د. محمد", "د. علي", "د. فاطمة", "د. خالد"];
+?>
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة مواعيد الأطباء</title>
+    <link rel="stylesheet" href="../assets/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; padding: 20px; }
+        .container { max-width: 1200px; }
+        .appointment-card { background: white; padding: 20px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .status-confirmed { border-right: 4px solid #28a745; }
+        .status-pending { border-right: 4px solid #ffc107; }
+        .status-cancelled { border-right: 4px solid #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>📅 إدارة مواعيد الأطباء</h1>
+            <div>
+                <a href="dashboard.php" class="btn btn-success">🏠 الرئيسية</a>
+                <a href="logout.php" class="btn btn-danger">🚪 تسجيل الخروج</a>
+            </div>
+        </div>
+
+        <!-- عرض الرسائل -->
+        <?php if (isset($message)): ?>
+            <div class="alert alert-success"><?php echo $message; ?></div>
+        <?php endif; ?>
+
+        <!-- نموذج إضافة/تعديل موعد -->
+        <div class="appointment-card">
+            <h3><?php echo $edit_appointment ? '✏️ تعديل الموعد' : '➕ إضافة موعد جديد'; ?></h3>
+            <form method="post">
+                <?php if ($edit_appointment): ?>
+                    <input type="hidden" name="appointment_id" value="<?php echo $edit_appointment['id']; ?>">
+                <?php endif; ?>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">اسم المريض</label>
+                            <input type="text" class="form-control" name="patient_name"
+                                   value="<?php echo $edit_appointment ? $edit_appointment['patient_name'] : ''; ?>" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">اسم الطبيب</label>
+                            <select class="form-select" name="doctor_name" required>
+                                <option value="">اختر الطبيب</option>
+                                <?php foreach($doctors as $doctor): ?>
+                                    <option value="<?php echo $doctor; ?>"
+                                        <?php echo ($edit_appointment && $edit_appointment['doctor_name'] == $doctor) ? 'selected' : ''; ?>>
+                                        <?php echo $doctor; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">تاريخ الموعد</label>
+                            <input type="date" class="form-control" name="appointment_date"
+                                   value="<?php echo $edit_appointment ? $edit_appointment['appointment_date'] : ''; ?>" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">وقت الموعد</label>
+                            <input type="time" class="form-control" name="appointment_time"
+                                   value="<?php echo $edit_appointment ? $edit_appointment['appointment_time'] : ''; ?>" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">الحالة</label>
+                            <select class="form-select" name="status" required>
+                                <option value="مؤكد" <?php echo ($edit_appointment && $edit_appointment['status'] == 'مؤكد') ? 'selected' : ''; ?>>مؤكد</option>
+                                <option value="في الانتظار" <?php echo ($edit_appointment && $edit_appointment['status'] == 'في الانتظار') ? 'selected' : ''; ?>>في الانتظار</option>
+                                <option value="ملغي" <?php echo ($edit_appointment && $edit_appointment['status'] == 'ملغي') ? 'selected' : ''; ?>>ملغي</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" name="<?php echo $edit_appointment ? 'update_appointment' : 'add_appointment'; ?>"
+                        class="btn btn-primary">
+                    <?php echo $edit_appointment ? 'تحديث الموعد' : 'إضافة الموعد'; ?>
+                </button>
+                <?php if ($edit_appointment): ?>
+                    <a href="appointments.php" class="btn btn-secondary">إلغاء</a>
+                <?php endif; ?>
+            </form>
+        </div>
+
+        <!-- عرض المواعيد باستخدام for loop -->
+        <h3 class="mt-4">📋 قائمة المواعيد (<?php echo $appointments->num_rows; ?>)</h3>
+
+        <?php if ($appointments->num_rows > 0): ?>
+            <?php for ($i = 0; $appointment = $appointments->fetch_assoc(); $i++): ?>
+                <div class="appointment-card status-<?php echo str_replace(' ', '-', strtolower($appointment['status'])); ?>">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5>👤 <?php echo $appointment['patient_name']; ?></h5>
+                            <p class="mb-1">🩺 الطبيب: <?php echo $appointment['doctor_name']; ?></p>
+                            <p class="mb-1">📅 التاريخ: <?php echo $appointment['appointment_date']; ?></p>
+                            <p class="mb-1">⏰ الوقت: <?php echo $appointment['appointment_time']; ?></p>
+                            <span class="badge bg-<?php
+                                echo $appointment['status'] == 'مؤكد' ? 'success' :
+                                     ($appointment['status'] == 'في الانتظار' ? 'warning' : 'danger');
+                            ?>">
+                                <?php echo $appointment['status']; ?>
+                            </span>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group">
+                                <a href="appointments.php?edit=<?php echo $appointment['id']; ?>" class="btn btn-warning btn-sm">✏️ تعديل</a>
+                                <a href="appointments.php?delete=<?php echo $appointment['id']; ?>" class="btn btn-danger btn-sm"
+                                   onclick="return confirm('هل أنت متأكد من الحذف؟')">🗑️ حذف</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endfor; ?>
+        <?php else: ?>
+            <div class="alert alert-info">لا توجد مواعيد حالياً. أضف موعد جديد!</div>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
+
+
+
+CREATE TABLE appointments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_name VARCHAR(255) NOT NULL,
+    doctor_name VARCHAR(255) NOT NULL,
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    status ENUM('مؤكد', 'في الانتظار', 'ملغي') DEFAULT 'في الانتظار',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
